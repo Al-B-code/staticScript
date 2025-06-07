@@ -1,11 +1,14 @@
 import fs from "fs";
 import readline from "readline";
 
-// Regex to find and extract the phrase part from wrapped patterns (now case-insensitive)
+// Regex to find and extract the phrase part from wrapped patterns (case-insensitive)
 const WRAPPED_PHRASE_EXTRACTION_PATTERN =
   /@\[(?:static|static-header)#(.*?)\]/gi;
-// Regex to find and remove the entire wrapped pattern (now case-insensitive)
+// Regex to find and remove the entire wrapped pattern (case-insensitive)
 const WRAPPED_PATTERN_REMOVAL_PATTERN = /@\[(?:static|static-header)#.*?\]/gi;
+// Regex to find HTML-like tags and their content/attributes (e.g., <div class="test">, <img src="x" />)
+// This is a simplified regex and might not cover all complex HTML edge cases.
+const HTML_TAG_PATTERN = /<[^>]+?>/g; // Matches anything between < and > (non-greedy)
 
 /**
  * Escapes special characters in a string to be safely used in a RegExp constructor.
@@ -18,7 +21,7 @@ function escapeRegExp(string) {
 
 /**
  * Finds phrases that are known to be wrapped (from @[static#...] or @[static-header#...])
- * but appear elsewhere in the document unwrapped.
+ * but appear elsewhere in the document unwrapped, ignoring instances within HTML-like tags.
  *
  * @param {string} filepath The path to the text file.
  * @returns {Promise<Map<string, number[]>>} A Promise that resolves to a Map
@@ -45,10 +48,8 @@ async function findUnwrappedPhraseOccurrences(filepath) {
 
     for await (const line of rl1) {
       let match;
-      // Reset for each line when using global flag with exec()
       WRAPPED_PHRASE_EXTRACTION_PATTERN.lastIndex = 0;
       while ((match = WRAPPED_PHRASE_EXTRACTION_PATTERN.exec(line)) !== null) {
-        // Store the phrase as it's found (its original casing)
         knownWrappedPhrases.add(match[1]);
       }
     }
@@ -63,7 +64,9 @@ async function findUnwrappedPhraseOccurrences(filepath) {
     }
 
     // --- Pass 2: Search for unwrapped instances of these phrases ---
-    console.log("\nPass 2: Searching for unwrapped instances...");
+    console.log(
+      "\nPass 2: Searching for unwrapped instances (ignoring HTML tags)..."
+    );
     lineNumber = 0;
     let fileStream2 = fs.createReadStream(filepath, { encoding: "utf-8" });
     let rl2 = readline.createInterface({
@@ -73,16 +76,18 @@ async function findUnwrappedPhraseOccurrences(filepath) {
 
     for await (const line of rl2) {
       lineNumber++;
-      // Remove wrapped patterns from the line to isolate unwrapped text
-      const cleanedLine = line.replace(WRAPPED_PATTERN_REMOVAL_PATTERN, "");
+      // First, remove the @[static#...] patterns
+      let cleanedLine = line.replace(WRAPPED_PATTERN_REMOVAL_PATTERN, "");
+
+      // Second, replace content within HTML tags with spaces
+      // This prevents matching phrases inside tag attributes or tag names
+      cleanedLine = cleanedLine.replace(HTML_TAG_PATTERN, " ");
 
       for (const phrase of knownWrappedPhrases) {
         const escapedPhrase = escapeRegExp(phrase);
-        // Create a case-insensitive regex for the bare phrase, ensuring whole word match
-        const barePhrasePattern = new RegExp(`\\b${escapedPhrase}\\b`, "gi"); // Added 'i' flag here
+        const barePhrasePattern = new RegExp(`\\b${escapedPhrase}\\b`, "gi");
 
         let match;
-        // Reset for each phrase search on the line
         barePhrasePattern.lastIndex = 0;
         while ((match = barePhrasePattern.exec(cleanedLine)) !== null) {
           if (!unwrappedOccurrences.has(phrase)) {
@@ -130,7 +135,6 @@ async function findUnwrappedPhraseOccurrences(filepath) {
 function processResults(unwrappedOccurrencesMap) {
   if (unwrappedOccurrencesMap.size > 0) {
     console.log("\n--- Unwrapped Phrase Occurrences Found ---");
-    // Sort phrases alphabetically for consistent output
     const sortedPhrases = Array.from(unwrappedOccurrencesMap.keys()).sort();
 
     for (const phrase of sortedPhrases) {
