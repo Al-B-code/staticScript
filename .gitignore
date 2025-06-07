@@ -1,0 +1,9 @@
+.idea/
+.project
+.settings/
+.classpath
+.DS_Store/
+npm-debug.log
+node_modules/
+example/daemon
+example/node_modules
