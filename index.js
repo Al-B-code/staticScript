@@ -111,12 +111,11 @@ async function findUnwrappedPhraseOccurrences(filepath) {
   }
 }
 
-// --- Main execution block ---
 (async () => {
   const filePath = process.argv[2];
 
   if (!filePath) {
-    console.log("Usage: node findPhrases.js <path_to_your_text_file>");
+    console.log("Usage: node index.js <path_to_your_text_file>");
     console.log("\nPlease provide a file path as a command-line argument.");
     process.exit(1);
   }
