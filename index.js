@@ -134,6 +134,9 @@ async function findUnwrappedPhraseOccurrences(filepath) {
 function processResults(unwrappedOccurrencesMap) {
   if (unwrappedOccurrencesMap.size > 0) {
     console.log("\n--- Unwrapped Phrase Occurrences Found ---");
+    console.log(
+      "\n--- Bear In Mind, Pluralisations Of Words Will Be Missed. Check For That ---"
+    );
     const sortedPhrases = Array.from(unwrappedOccurrencesMap.keys()).sort();
 
     for (const phrase of sortedPhrases) {
